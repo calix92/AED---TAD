@@ -15,3 +15,9 @@ ImageRegionFillingWithSTACK
 int ImageRegionFillingWithQUEUE
 
 ImageSegmentation
+
+
+
+
+
+(rm -f *.pbm *.ppm)
