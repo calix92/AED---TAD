@@ -285,6 +285,7 @@ void ImageDestroy(Image* imgp) {
  * ImageCopy
  *  Cria e retorna uma cópia profunda (deep copy) da imagem original.
  *  Copia a LUT e todos os índices de pixel.
+ *  Deep copy sem realocar LUT: reaproveita a LUT criada por ImageCreate.
  *-----------------------------------------------------------------*/
 Image ImageCopy(const Image img) {
     if (img == NULL) return NULL;
@@ -292,13 +293,8 @@ Image ImageCopy(const Image img) {
     Image copy = ImageCreate(img->width, img->height);
     if (copy == NULL) return NULL;
 
-    // Copiar LUT
+    // Copiar LUT sem realocar
     copy->num_colors = img->num_colors;
-    copy->LUT = (rgb_t *) malloc(copy->num_colors * sizeof(rgb_t));
-    if (copy->LUT == NULL) {
-        ImageDestroy(&copy);
-        return NULL;
-    }
     for (uint16 i = 0; i < img->num_colors; i++)
         copy->LUT[i] = img->LUT[i];
 
@@ -309,6 +305,7 @@ Image ImageCopy(const Image img) {
 
     return copy;
 }
+
 
 
 /// Printing on the console
@@ -574,32 +571,45 @@ uint16 ImageColors(const Image img) {
 /// NOTE: The same rgb color may correspond to different LUT labels in
 /// different images!
 /*------------------------------------------------------------------
- * ImageIsEqual
- *  Compara duas imagens: dimensões, LUT e índices de pixels.
  *  Retorna 1 se forem iguais, 0 caso contrário.
+ * ImageIsEqual
+ *  Compara dimensões, nº de cores, LUT e todos os pixels.
+ *  Retorna 1 se forem iguais, 0 caso contrário.
+ *  Otimizações:
+ *    - early-return em cada discrepância
+ *    - cache de width/height em locals (evita loads repetidos)
+ *    - memcmp na LUT (uint32) para acelerar
+ *    - contagem PIXMEM (+2) por comparação de pixels (dois reads)
  *-----------------------------------------------------------------*/
 int ImageIsEqual(const Image img1, const Image img2) {
     if (img1 == NULL || img2 == NULL) return 0;
+    if (img1 == img2) return 1;  // mesma instância → iguais
 
-    if (img1->width != img2->width || img1->height != img2->height)
-        return 0;
+    const uint32 W = img1->width, H = img1->height;
+    if (W != img2->width || H != img2->height) return 0;
 
-    if (img1->num_colors != img2->num_colors)
-        return 0;
+    if (img1->num_colors != img2->num_colors) return 0;
 
-    // Comparar LUT
-    for (uint16 i = 0; i < img1->num_colors; i++)
-        if (img1->LUT[i] != img2->LUT[i])
-            return 0;
+    // Comparar LUT de uma vez (rgb_t é uint32)
+    if (img1->num_colors > 0) {
+        const size_t lutBytes = (size_t)img1->num_colors * sizeof(rgb_t);
+        if (memcmp(img1->LUT, img2->LUT, lutBytes) != 0) return 0;
+    }
 
-    // Comparar matriz de pixels
-    for (uint32 v = 0; v < img1->height; v++)
-        for (uint32 u = 0; u < img1->width; u++)
-            if (img1->image[v][u] != img2->image[v][u])
-                return 0;
+    // Comparar pixels linha a linha, contando acessos PIXMEM
+    for (uint32 v = 0; v < H; v++) {
+        const uint16 *row1 = img1->image[v];
+        const uint16 *row2 = img2->image[v];
 
+        for (uint32 u = 0; u < W; u++) {
+            // dois acessos ao array de pixels (row1[u] e row2[u])
+            PIXMEM += 2;
+            if (row1[u] != row2[u]) return 0;
+        }
+    }
     return 1;
 }
+
 
 
 
@@ -629,25 +639,25 @@ int ImageIsDifferent(const Image img1, const Image img2) {
  * ImageRotate90CW
  *  Cria uma nova imagem rotacionada 90° no sentido horário.
  *  O pixel (v, u) da original vai para (u, height - 1 - v).
+ *  Rotação 90° CW sem realocar LUT.
  *-----------------------------------------------------------------*/
 Image ImageRotate90CW(const Image img) {
     if (img == NULL) return NULL;
 
-    Image rotated = ImageCreate(img->height, img->width);
+    const uint32 W = img->width, H = img->height;
+
+    Image rotated = ImageCreate(H, W);
     if (rotated == NULL) return NULL;
 
+    // Copiar LUT sem realocar
     rotated->num_colors = img->num_colors;
-    rotated->LUT = (rgb_t *) malloc(rotated->num_colors * sizeof(rgb_t));
-    if (rotated->LUT == NULL) {
-        ImageDestroy(&rotated);
-        return NULL;
-    }
     for (uint16 i = 0; i < img->num_colors; i++)
         rotated->LUT[i] = img->LUT[i];
 
-    for (uint32 v = 0; v < img->height; v++)
-        for (uint32 u = 0; u < img->width; u++)
-            rotated->image[u][img->height - 1 - v] = img->image[v][u];
+    // Rotação (v,u)->(u, H-1-v)
+    for (uint32 v = 0; v < H; v++)
+        for (uint32 u = 0; u < W; u++)
+            rotated->image[u][H - 1 - v] = img->image[v][u];
 
     return rotated;
 }
@@ -664,25 +674,25 @@ Image ImageRotate90CW(const Image img) {
  * ImageRotate180CW
  *  Cria uma nova imagem rotacionada 180° no sentido horário.
  *  O pixel (v, u) vai para (height - 1 - v, width - 1 - u).
+ *  Rotação 180° CW sem realocar LUT.
  *-----------------------------------------------------------------*/
 Image ImageRotate180CW(const Image img) {
     if (img == NULL) return NULL;
 
-    Image rotated = ImageCreate(img->width, img->height);
+    const uint32 W = img->width, H = img->height;
+
+    Image rotated = ImageCreate(W, H);
     if (rotated == NULL) return NULL;
 
+    // Copiar LUT sem realocar
     rotated->num_colors = img->num_colors;
-    rotated->LUT = (rgb_t *) malloc(rotated->num_colors * sizeof(rgb_t));
-    if (rotated->LUT == NULL) {
-        ImageDestroy(&rotated);
-        return NULL;
-    }
     for (uint16 i = 0; i < img->num_colors; i++)
         rotated->LUT[i] = img->LUT[i];
 
-    for (uint32 v = 0; v < img->height; v++)
-        for (uint32 u = 0; u < img->width; u++)
-            rotated->image[img->height - 1 - v][img->width - 1 - u] = img->image[v][u];
+    // (v,u)->(H-1-v, W-1-u)
+    for (uint32 v = 0; v < H; v++)
+        for (uint32 u = 0; u < W; u++)
+            rotated->image[H - 1 - v][W - 1 - u] = img->image[v][u];
 
     return rotated;
 }
@@ -822,53 +832,52 @@ static int floodFillRecursive(Image img, int u, int v, uint16 background, uint16
  *  cada pixel é processado e os seus vizinhos válidos são empilhados —
  *  obtendo o mesmo resultado lógico da versão recursiva,
  *  mas com melhor controlo da memória e maior robustez para imagens grandes.
+ * 
+ *  (marcar o pixel logo ao empilhar (marca “visitado”),
+ *  em vez de só ao tirar da pilha. Isto evita reempilhar o mesmo pixel várias vezes.)
  *------------------------------------------------------------------*/
 
 int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
-    if (!ImageIsValidPixel(img, u, v))
-        return 0;
+    if (!ImageIsValidPixel(img, u, v)) return 0;
 
-    uint16 background = img->image[v][u];
-    if (background == label)
-        return 0;
+    const uint16 background = img->image[v][u];
+    if (background == label) return 0;
 
-    Stack* stack = StackCreate(10000); // tamanho inicial arbitrário
-    if (stack == NULL)
-        return 0;
+    Stack* stack = StackCreate(10000);
+    if (!stack) return 0;
 
     int count = 0;
 
-    PixelCoords seed = {u, v};
-    StackPush(stack, seed);
+    // Marcar e empilhar semente já como visitada
+    img->image[v][u] = label;
+    count++;
+    StackPush(stack, (PixelCoords){u, v});
 
     while (!StackIsEmpty(stack)) {
         PixelCoords p = StackPop(stack);
-        int x = p.u;
-        int y = p.v;
+        const int x = p.u, y = p.v;
 
-        if (!ImageIsValidPixel(img, x, y))
-            continue;
-        if (img->image[y][x] != background)
-            continue;
+        // Vizinhos
+        const PixelCoords neigh[4] = {
+            {x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}
+        };
 
-        img->image[y][x] = label;
-        count++;
+        for (int i = 0; i < 4; i++) {
+            const int nx = neigh[i].u, ny = neigh[i].v;
+            if (!ImageIsValidPixel(img, nx, ny)) continue;
+            if (img->image[ny][nx] != background) continue;
 
-        // Adicionar vizinhos
-        PixelCoords right = {x + 1, y};
-        PixelCoords left  = {x - 1, y};
-        PixelCoords down  = {x, y + 1};
-        PixelCoords up    = {x, y - 1};
-
-        StackPush(stack, right);
-        StackPush(stack, left);
-        StackPush(stack, down);
-        StackPush(stack, up);
+            // Marca no ato de inserir → evita duplicados
+            img->image[ny][nx] = label;
+            count++;
+            StackPush(stack, (PixelCoords){nx, ny});
+        }
     }
 
     StackDestroy(&stack);
     return count;
 }
+
 
 /*------------------------------------------------------------------
  * ImageRegionFillingWithQUEUE
@@ -891,52 +900,49 @@ int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
  *  uniformemente a partir do pixel inicial (u, v).
  *  É uma alternativa mais estável em termos de ordem de propagação,
  *  embora ambas as abordagens (STACK e QUEUE) produzam o mesmo resultado.
+ * 
+ *  BFS “sem duplicados”.
  *------------------------------------------------------------------*/
 int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
-    if (!ImageIsValidPixel(img, u, v))
-        return 0;
+    if (!ImageIsValidPixel(img, u, v)) return 0;
 
-    uint16 background = img->image[v][u];
-    if (background == label)
-        return 0;
+    const uint16 background = img->image[v][u];
+    if (background == label) return 0;
 
-    Queue* queue = QueueCreate(10000); // tamanho inicial arbitrário
-    if (queue == NULL)
-        return 0;
+    Queue* queue = QueueCreate(10000);
+    if (!queue) return 0;
 
     int count = 0;
-    PixelCoords seed = {u, v};
-    QueueEnqueue(queue, seed);
+
+    // Marca e enfileira semente
+    img->image[v][u] = label;
+    count++;
+    QueueEnqueue(queue, (PixelCoords){u, v});
 
     while (!QueueIsEmpty(queue)) {
         PixelCoords p = QueueDequeue(queue);
-        int x = p.u;
-        int y = p.v;
+        const int x = p.u, y = p.v;
 
-        if (!ImageIsValidPixel(img, x, y))
-            continue;
-        if (img->image[y][x] != background)
-            continue;
+        const PixelCoords neigh[4] = {
+            {x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}
+        };
 
-        // Pinta o pixel
-        img->image[y][x] = label;
-        count++;
+        for (int i = 0; i < 4; i++) {
+            const int nx = neigh[i].u, ny = neigh[i].v;
+            if (!ImageIsValidPixel(img, nx, ny)) continue;
+            if (img->image[ny][nx] != background) continue;
 
-        // Adiciona os vizinhos válidos à fila (ordem: E, D, C, B)
-        PixelCoords right = {x + 1, y};
-        PixelCoords left  = {x - 1, y};
-        PixelCoords down  = {x, y + 1};
-        PixelCoords up    = {x, y - 1};
-
-        QueueEnqueue(queue, right);
-        QueueEnqueue(queue, left);
-        QueueEnqueue(queue, down);
-        QueueEnqueue(queue, up);
+            // Marca já ao inserir para evitar múltiplas entradas
+            img->image[ny][nx] = label;
+            count++;
+            QueueEnqueue(queue, (PixelCoords){nx, ny});
+        }
     }
 
     QueueDestroy(&queue);
     return count;
 }
+
 
 
 /*------------------------------------------------------------------
