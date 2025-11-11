@@ -759,6 +759,8 @@ int ImageIsValidPixel(const Image img, int u, int v) {
  *  de propagação mas com controlo manual sobre a pilha ou fila.
  *------------------------------------------------------------------*/
 
+static int floodFillRecursive(Image img, int u, int v, uint16 background, uint16 label);
+
 int ImageRegionFillingRecursive(Image img, int u, int v, uint16 label) {
     // Verificar se o pixel é válido
     if (!ImageIsValidPixel(img, u, v))
