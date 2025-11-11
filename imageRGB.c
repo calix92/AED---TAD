@@ -11,10 +11,10 @@
 /// 2025
 
 // Student authors (fill in below):
+// NMec: 125043
+// Name: David Caride Cálix
 // NMec:
-// Name:
-// NMec:
-// Name:
+// Name:Diogo André Ruivo
 //
 // Date:
 //
@@ -281,14 +281,35 @@ void ImageDestroy(Image* imgp) {
 ///
 /// On success, a new copied image is returned.
 /// (The caller is responsible for destroying the returned image!)
+/*------------------------------------------------------------------
+ * ImageCopy
+ *  Cria e retorna uma cópia profunda (deep copy) da imagem original.
+ *  Copia a LUT e todos os índices de pixel.
+ *-----------------------------------------------------------------*/
 Image ImageCopy(const Image img) {
-  assert(img != NULL);
+    if (img == NULL) return NULL;
 
-  // TO BE COMPLETED
-  // ...
+    Image copy = ImageCreate(img->width, img->height);
+    if (copy == NULL) return NULL;
 
-  return NULL;
+    // Copiar LUT
+    copy->num_colors = img->num_colors;
+    copy->LUT = (rgb_t *) malloc(copy->num_colors * sizeof(rgb_t));
+    if (copy->LUT == NULL) {
+        ImageDestroy(&copy);
+        return NULL;
+    }
+    for (uint16 i = 0; i < img->num_colors; i++)
+        copy->LUT[i] = img->LUT[i];
+
+    // Copiar matriz de índices
+    for (uint32 v = 0; v < img->height; v++)
+        for (uint32 u = 0; u < img->width; u++)
+            copy->image[v][u] = img->image[v][u];
+
+    return copy;
 }
+
 
 /// Printing on the console
 
@@ -552,15 +573,35 @@ uint16 ImageColors(const Image img) {
 /// Check if img1 and img2 represent equal images.
 /// NOTE: The same rgb color may correspond to different LUT labels in
 /// different images!
+/*------------------------------------------------------------------
+ * ImageIsEqual
+ *  Compara duas imagens: dimensões, LUT e índices de pixels.
+ *  Retorna 1 se forem iguais, 0 caso contrário.
+ *-----------------------------------------------------------------*/
 int ImageIsEqual(const Image img1, const Image img2) {
-  assert(img1 != NULL);
-  assert(img2 != NULL);
+    if (img1 == NULL || img2 == NULL) return 0;
 
-  // TO BE COMPLETED
-  // ...
+    if (img1->width != img2->width || img1->height != img2->height)
+        return 0;
 
-  return 0;
+    if (img1->num_colors != img2->num_colors)
+        return 0;
+
+    // Comparar LUT
+    for (uint16 i = 0; i < img1->num_colors; i++)
+        if (img1->LUT[i] != img2->LUT[i])
+            return 0;
+
+    // Comparar matriz de pixels
+    for (uint32 v = 0; v < img1->height; v++)
+        for (uint32 u = 0; u < img1->width; u++)
+            if (img1->image[v][u] != img2->image[v][u])
+                return 0;
+
+    return 1;
 }
+
+
 
 int ImageIsDifferent(const Image img1, const Image img2) {
   assert(img1 != NULL);
@@ -583,14 +624,35 @@ int ImageIsDifferent(const Image img1, const Image img2) {
 ///
 /// On success, a new image is returned.
 /// (The caller is responsible for destroying the returned image!)
+
+/*------------------------------------------------------------------
+ * ImageRotate90CW
+ *  Cria uma nova imagem rotacionada 90° no sentido horário.
+ *  O pixel (v, u) da original vai para (u, height - 1 - v).
+ *-----------------------------------------------------------------*/
 Image ImageRotate90CW(const Image img) {
-  assert(img != NULL);
+    if (img == NULL) return NULL;
 
-  // TO BE COMPLETED
-  // ...
+    Image rotated = ImageCreate(img->height, img->width);
+    if (rotated == NULL) return NULL;
 
-  return NULL;
+    rotated->num_colors = img->num_colors;
+    rotated->LUT = (rgb_t *) malloc(rotated->num_colors * sizeof(rgb_t));
+    if (rotated->LUT == NULL) {
+        ImageDestroy(&rotated);
+        return NULL;
+    }
+    for (uint16 i = 0; i < img->num_colors; i++)
+        rotated->LUT[i] = img->LUT[i];
+
+    for (uint32 v = 0; v < img->height; v++)
+        for (uint32 u = 0; u < img->width; u++)
+            rotated->image[u][img->height - 1 - v] = img->image[v][u];
+
+    return rotated;
 }
+
+
 
 /// Rotate 180 degrees clockwise (CW).
 /// Returns a rotated version of the image.
@@ -598,14 +660,34 @@ Image ImageRotate90CW(const Image img) {
 ///
 /// On success, a new image is returned.
 /// (The caller is responsible for destroying the returned image!)
+/*------------------------------------------------------------------
+ * ImageRotate180CW
+ *  Cria uma nova imagem rotacionada 180° no sentido horário.
+ *  O pixel (v, u) vai para (height - 1 - v, width - 1 - u).
+ *-----------------------------------------------------------------*/
 Image ImageRotate180CW(const Image img) {
-  assert(img != NULL);
+    if (img == NULL) return NULL;
 
-  // TO BE COMPLETED
-  // ...
+    Image rotated = ImageCreate(img->width, img->height);
+    if (rotated == NULL) return NULL;
 
-  return NULL;
+    rotated->num_colors = img->num_colors;
+    rotated->LUT = (rgb_t *) malloc(rotated->num_colors * sizeof(rgb_t));
+    if (rotated->LUT == NULL) {
+        ImageDestroy(&rotated);
+        return NULL;
+    }
+    for (uint16 i = 0; i < img->num_colors; i++)
+        rotated->LUT[i] = img->LUT[i];
+
+    for (uint32 v = 0; v < img->height; v++)
+        for (uint32 u = 0; u < img->width; u++)
+            rotated->image[img->height - 1 - v][img->width - 1 - u] = img->image[v][u];
+
+    return rotated;
 }
+
+
 
 /// Check whether pixel coords (u, v) are inside img.
 /// ATTENTION
@@ -632,59 +714,292 @@ int ImageIsValidPixel(const Image img, int u, int v) {
 /// Each function carries out a different version of the algorithm.
 
 /// Region growing using the recursive flood-filling algorithm.
+/*------------------------------------------------------------------
+ * ImageRegionFillingRecursive
+ *  Preenche uma região conexa da imagem (4-vizinhos) com uma nova cor.
+ *  Usa o algoritmo recursivo de Flood Fill:
+ *   - Parte do pixel (u, v)
+ *   - Altera todos os pixels adjacentes (cima, baixo, esquerda, direita)
+ *     que tenham a mesma cor inicial ("background") para o novo label.
+ *
+ *  Parâmetros:
+ *    img   → imagem a modificar
+ *    u,v   → coordenadas do pixel inicial
+ *    label → novo índice de cor (LUT index)
+ *
+ *  Retorna:
+ *    o número total de pixels que foram modificados.
+ *------------------------------------------------------------------*/
+
+/*------------------------------------------------------------------
+ * NOTA:
+ *  Esta versão recursiva do algoritmo Flood Fill é a implementação
+ *  mais direta e intuitiva do processo de preenchimento de regiões.
+ *
+ *  A função chama-se a si própria (recursão) para explorar os 4
+ *  vizinhos de cada pixel (cima, baixo, esquerda e direita) que ainda
+ *  pertencem à região com a cor de fundo original.
+ *
+ *  Apesar da sua simplicidade e clareza conceptual, esta abordagem
+ *  tem uma limitação importante: para imagens grandes, a profundidade
+ *  de recursão pode ser muito elevada, levando a um possível **stack overflow**.
+ *
+ *  As versões iterativas (com STACK e QUEUE) foram desenvolvidas para
+ *  resolver precisamente essa limitação, simulando o mesmo processo
+ *  de propagação mas com controlo manual sobre a pilha ou fila.
+ *------------------------------------------------------------------*/
+
 int ImageRegionFillingRecursive(Image img, int u, int v, uint16 label) {
-  assert(img != NULL);
-  assert(ImageIsValidPixel(img, u, v));
-  assert(label < FIXED_LUT_SIZE);
+    // Verificar se o pixel é válido
+    if (!ImageIsValidPixel(img, u, v))
+        return 0;
 
-  // TO BE COMPLETED
-  // ...
+    // Guardar a cor original (background)
+    uint16 background = img->image[v][u];
 
-  return 0;
+    // Se o pixel já tem a nova cor, não há nada a fazer
+    if (background == label)
+        return 0;
+
+    // Chamar a função recursiva auxiliar
+    return floodFillRecursive(img, u, v, background, label);
 }
+
+/*------------------------------------------------------------------
+// Função auxiliar interna (static) — apenas visível dentro deste ficheiro.
+// Implementa a parte recursiva do algoritmo Flood Fill, garantindo
+// encapsulamento e evitando conflitos de nomes com outros módulos.
+*-----------------------------------------------------------------*/
+static int floodFillRecursive(Image img, int u, int v, uint16 background, uint16 label) {
+    // Parar se estiver fora da imagem
+    if (!ImageIsValidPixel(img, u, v))
+        return 0;
+
+    // Parar se o pixel não tiver a cor de fundo (background)
+    if (img->image[v][u] != background)
+        return 0;
+
+    // Atribuir o novo label ao pixel
+    img->image[v][u] = label;
+
+    // Contar este pixel
+    int count = 1;
+
+    // Propagar recursivamente para os 4 vizinhos
+    count += floodFillRecursive(img, u + 1, v, background, label);  // direita
+    count += floodFillRecursive(img, u - 1, v, background, label);  // esquerda
+    count += floodFillRecursive(img, u, v + 1, background, label);  // baixo
+    count += floodFillRecursive(img, u, v - 1, background, label);  // cima
+
+    return count;
+}
+
 
 /// Region growing using a STACK of pixel coordinates to
 /// implement the flood-filling algorithm.
+/*------------------------------------------------------------------
+ * ImageRegionFillingWithSTACK
+ *  Preenche uma região conexa da imagem (4-vizinhos) com uma nova cor,
+ *  utilizando uma pilha (STACK) para evitar a recursão.
+ *
+ *  Implementa o algoritmo iterativo de Flood Fill:
+ *   - Começa no pixel (u, v)
+ *   - Enquanto houver pixels na pilha, remove o do topo e colore-o
+ *   - Adiciona à pilha todos os vizinhos válidos com a cor de fundo
+ *
+ *  Retorna o número total de pixels preenchidos.
+ *------------------------------------------------------------------*/
+
+/*------------------------------------------------------------------
+ * NOTA:
+ *  Esta implementação substitui a recursão explícita por uma pilha (STACK)
+ *  alocada dinamicamente, evitando o risco de **stack overflow** do sistema.
+ *
+ *  O TAD Stack (PixelCoordsStack) fornece as operações básicas Push e Pop,
+ *  permitindo gerir manualmente os pixels que ainda precisam de ser visitados.
+ *
+ *  Desta forma, o controlo da recursão é feito de forma iterativa —
+ *  cada pixel é processado e os seus vizinhos válidos são empilhados —
+ *  obtendo o mesmo resultado lógico da versão recursiva,
+ *  mas com melhor controlo da memória e maior robustez para imagens grandes.
+ *------------------------------------------------------------------*/
+
 int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
-  assert(img != NULL);
-  assert(ImageIsValidPixel(img, u, v));
-  assert(label < FIXED_LUT_SIZE);
+    if (!ImageIsValidPixel(img, u, v))
+        return 0;
 
-  // TO BE COMPLETED
-  // ...
+    uint16 background = img->image[v][u];
+    if (background == label)
+        return 0;
 
-  return 0;
+    Stack* stack = StackCreate(10000); // tamanho inicial arbitrário
+    if (stack == NULL)
+        return 0;
+
+    int count = 0;
+
+    PixelCoords seed = {u, v};
+    StackPush(stack, seed);
+
+    while (!StackIsEmpty(stack)) {
+        PixelCoords p = StackPop(stack);
+        int x = p.u;
+        int y = p.v;
+
+        if (!ImageIsValidPixel(img, x, y))
+            continue;
+        if (img->image[y][x] != background)
+            continue;
+
+        img->image[y][x] = label;
+        count++;
+
+        // Adicionar vizinhos
+        PixelCoords right = {x + 1, y};
+        PixelCoords left  = {x - 1, y};
+        PixelCoords down  = {x, y + 1};
+        PixelCoords up    = {x, y - 1};
+
+        StackPush(stack, right);
+        StackPush(stack, left);
+        StackPush(stack, down);
+        StackPush(stack, up);
+    }
+
+    StackDestroy(&stack);
+    return count;
 }
 
-/// Region growing using a QUEUE of pixel coordinates to
-/// implement the flood-filling algorithm.
+/*------------------------------------------------------------------
+ * ImageRegionFillingWithQUEUE
+ *  Preenche uma região conexa da imagem (4-vizinhos) com uma nova cor,
+ *  utilizando uma fila (QUEUE) para processar os pixels por camadas.
+ *
+ *  Implementa o algoritmo iterativo de Flood Fill na sua forma BFS:
+ *   - Começa no pixel (u, v)
+ *   - Enquanto houver pixels na fila, remove o da frente e colore-o
+ *   - Adiciona à fila todos os vizinhos válidos com a cor de fundo
+ *
+ *  Retorna o número total de pixels preenchidos.
+ *------------------------------------------------------------------*/
+
+/*------------------------------------------------------------------
+ * NOTA:
+ *  Esta versão usa o TAD Queue (PixelCoordsQueue) para gerir os
+ *  pixels pendentes de visita de forma **FIFO** (First In, First Out).
+ *  Isto garante um preenchimento em largura (BFS), expandindo a região
+ *  uniformemente a partir do pixel inicial (u, v).
+ *  É uma alternativa mais estável em termos de ordem de propagação,
+ *  embora ambas as abordagens (STACK e QUEUE) produzam o mesmo resultado.
+ *------------------------------------------------------------------*/
 int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
-  assert(img != NULL);
-  assert(ImageIsValidPixel(img, u, v));
-  assert(label < FIXED_LUT_SIZE);
+    if (!ImageIsValidPixel(img, u, v))
+        return 0;
 
-  // TO BE COMPLETED
-  // ...
+    uint16 background = img->image[v][u];
+    if (background == label)
+        return 0;
 
-  return 0;
+    Queue* queue = QueueCreate(10000); // tamanho inicial arbitrário
+    if (queue == NULL)
+        return 0;
+
+    int count = 0;
+    PixelCoords seed = {u, v};
+    QueueEnqueue(queue, seed);
+
+    while (!QueueIsEmpty(queue)) {
+        PixelCoords p = QueueDequeue(queue);
+        int x = p.u;
+        int y = p.v;
+
+        if (!ImageIsValidPixel(img, x, y))
+            continue;
+        if (img->image[y][x] != background)
+            continue;
+
+        // Pinta o pixel
+        img->image[y][x] = label;
+        count++;
+
+        // Adiciona os vizinhos válidos à fila (ordem: E, D, C, B)
+        PixelCoords right = {x + 1, y};
+        PixelCoords left  = {x - 1, y};
+        PixelCoords down  = {x, y + 1};
+        PixelCoords up    = {x, y - 1};
+
+        QueueEnqueue(queue, right);
+        QueueEnqueue(queue, left);
+        QueueEnqueue(queue, down);
+        QueueEnqueue(queue, up);
+    }
+
+    QueueDestroy(&queue);
+    return count;
 }
 
-/// Image Segmentation
 
-/// Label each WHITE region with a different color.
-/// - WHITE (the background color) has label (LUT index) 0.
-/// - Use GenerateNextColor to create the RGB color for each new region.
-///
-/// One of the region filling functions above is passed as the
-/// last argument, using a function pointer.
-///
-/// Returns the number of image regions found.
+/*------------------------------------------------------------------
+ * ImageSegmentation
+ *  Percorre toda a imagem e aplica a função de preenchimento (Flood Fill)
+ *  a cada nova região de pixels brancos (WHITE) ainda não identificada.
+ *
+ *  Cada região encontrada recebe um novo label (índice na LUT) e uma
+ *  nova cor RGB gerada automaticamente pela função GenerateNextColor().
+ *
+ *  Parâmetros:
+ *    img       → imagem a segmentar (modificada no processo)
+ *    fillFunct → ponteiro para uma das funções de Region Filling:
+ *                (ImageRegionFillingRecursive, WithSTACK ou WithQUEUE)
+ *
+ *  Retorna:
+ *    o número total de regiões identificadas na imagem.
+ *------------------------------------------------------------------*/
+
+/*------------------------------------------------------------------
+ * NOTA:
+ *  Esta função implementa o processo de **segmentação de imagem**
+ *  baseado em "region growing" — deteta todas as regiões conexas de
+ *  pixels brancos e preenche-as com cores distintas.
+ *
+ *  O uso de um ponteiro para função (fillFunct) torna o algoritmo
+ *  **modular e reutilizável**, permitindo testar diferentes abordagens
+ *  (recursiva, com pilha ou com fila) sem alterar o código principal.
+ *
+ *  Cada vez que é descoberta uma nova região branca, é atribuído um
+ *  novo label e uma nova cor RGB à LUT, obtida através de
+ *  GenerateNextColor(). Assim, cada região fica visualmente distinta.
+ *
+ *  Em suma, esta função demonstra o uso prático da abstração de funções
+ *  como parâmetros e consolida os conceitos de TAD e encapsulamento.
+ *------------------------------------------------------------------*/
 int ImageSegmentation(Image img, FillingFunction fillFunct) {
-  assert(img != NULL);
-  assert(fillFunct != NULL);
+    if (img == NULL || fillFunct == NULL)
+        return 0;
 
-  // TO BE COMPLETED
-  // ...
+    int regionCount = 0;              // Número total de regiões
+    rgb_t currentColor = 0x0000FF;    // Cor inicial (exemplo: azul)
+    uint16 currentLabel = ImageColors(img); // Começa após as cores existentes
 
-  return 0;
+    for (uint32 v = 0; v < img->height; v++) {
+        for (uint32 u = 0; u < img->width; u++) {
+            // Se encontrarmos um pixel branco (não segmentado)
+            if (img->image[v][u] == WHITE) {
+                // Adicionar nova cor à LUT
+                check(img->num_colors < FIXED_LUT_SIZE, "LUT Overflow");
+                img->LUT[currentLabel] = currentColor;
+                img->num_colors++;
+
+                // Preencher a região com o novo label
+                fillFunct(img, u, v, currentLabel);
+                regionCount++;
+
+                // Gerar próxima cor para a próxima região
+                currentColor = GenerateNextColor(currentColor);
+                currentLabel++;
+            }
+        }
+    }
+
+    return regionCount;
 }
