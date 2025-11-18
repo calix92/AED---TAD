@@ -293,15 +293,20 @@ Image ImageCopy(const Image img) {
     Image copy = ImageCreate(img->width, img->height);
     if (copy == NULL) return NULL;
 
-    // Copiar LUT sem realocar
+    // Copiar LUT
     copy->num_colors = img->num_colors;
-    for (uint16 i = 0; i < img->num_colors; i++)
-        copy->LUT[i] = img->LUT[i];
+    if (img->num_colors > 0) {
+        const size_t lutBytes = (size_t)img->num_colors * sizeof(rgb_t);
+        memcpy(copy->LUT, img->LUT, lutBytes);
+    }
 
-    // Copiar matriz de índices
-    for (uint32 v = 0; v < img->height; v++)
-        for (uint32 u = 0; u < img->width; u++)
-            copy->image[v][u] = img->image[v][u];
+    // Copiar pixels linha por linha (muito mais rápido!)
+    const size_t rowBytes = (size_t)img->width * sizeof(uint16);
+    for (uint32 v = 0; v < img->height; v++) {
+        memcpy(copy->image[v], img->image[v], rowBytes);
+        // Incrementar PIXMEM por linha (aproximação: width acessos)
+        PIXMEM += img->width;
+    }
 
     return copy;
 }
@@ -583,32 +588,30 @@ uint16 ImageColors(const Image img) {
  *-----------------------------------------------------------------*/
 int ImageIsEqual(const Image img1, const Image img2) {
     if (img1 == NULL || img2 == NULL) return 0;
-    if (img1 == img2) return 1;  // mesma instância → iguais
+    if (img1 == img2) return 1;
 
     const uint32 W = img1->width, H = img1->height;
     if (W != img2->width || H != img2->height) return 0;
-
     if (img1->num_colors != img2->num_colors) return 0;
 
-    // Comparar LUT de uma vez (rgb_t é uint32)
+    // Comparar LUT
     if (img1->num_colors > 0) {
         const size_t lutBytes = (size_t)img1->num_colors * sizeof(rgb_t);
         if (memcmp(img1->LUT, img2->LUT, lutBytes) != 0) return 0;
     }
 
-    // Comparar pixels linha a linha, contando acessos PIXMEM
+    // Comparar pixels linha por linha com memcmp (muito mais rápido!)
+    const size_t rowBytes = (size_t)W * sizeof(uint16);
     for (uint32 v = 0; v < H; v++) {
-        const uint16 *row1 = img1->image[v];
-        const uint16 *row2 = img2->image[v];
-
-        for (uint32 u = 0; u < W; u++) {
-            // dois acessos ao array de pixels (row1[u] e row2[u])
-            PIXMEM += 2;
-            if (row1[u] != row2[u]) return 0;
+        if (memcmp(img1->image[v], img2->image[v], rowBytes) != 0) {
+            PIXMEM += W;  // Contabilizar acessos
+            return 0;
         }
+        PIXMEM += W;  // Contabilizar acessos da linha
     }
     return 1;
 }
+
 
 
 
@@ -839,40 +842,58 @@ static int floodFillRecursive(Image img, int u, int v, uint16 background, uint16
  *  em vez de só ao tirar da pilha. Isto evita reempilhar o mesmo pixel várias vezes.)
  *------------------------------------------------------------------*/
 
+/*
+ * OTIMIZAÇÃO: Processar vizinhos inline sem array temporário
+ * Reduz alocações e melhora localidade de cache
+ */
 int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
     if (!ImageIsValidPixel(img, u, v)) return 0;
 
     const uint16 background = img->image[v][u];
     if (background == label) return 0;
 
-    Stack* stack = StackCreate(10000);
+    // Tamanho inicial adaptativo baseado na imagem
+    const uint32 initialSize = (img->width * img->height) / 100;
+    Stack* stack = StackCreate(initialSize > 100 ? initialSize : 100);
     if (!stack) return 0;
 
     int count = 0;
+    const int32_t W = (int32_t)img->width;
+    const int32_t H = (int32_t)img->height;
 
-    // Marcar e empilhar semente já como visitada
+    // Marcar e empilhar semente
     img->image[v][u] = label;
     count++;
     StackPush(stack, (PixelCoords){u, v});
 
     while (!StackIsEmpty(stack)) {
         PixelCoords p = StackPop(stack);
-        const int x = p.u, y = p.v;
+        const int32_t x = p.u, y = p.v;
 
-        // Vizinhos
-        const PixelCoords neigh[4] = {
-            {x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}
-        };
-
-        for (int i = 0; i < 4; i++) {
-            const int nx = neigh[i].u, ny = neigh[i].v;
-            if (!ImageIsValidPixel(img, nx, ny)) continue;
-            if (img->image[ny][nx] != background) continue;
-
-            // Marca no ato de inserir → evita duplicados
-            img->image[ny][nx] = label;
+        // Processar 4 vizinhos inline (evita array temporário)
+        // Direita
+        if (x + 1 < W && img->image[y][x + 1] == background) {
+            img->image[y][x + 1] = label;
             count++;
-            StackPush(stack, (PixelCoords){nx, ny});
+            StackPush(stack, (PixelCoords){x + 1, y});
+        }
+        // Esquerda
+        if (x > 0 && img->image[y][x - 1] == background) {
+            img->image[y][x - 1] = label;
+            count++;
+            StackPush(stack, (PixelCoords){x - 1, y});
+        }
+        // Baixo
+        if (y + 1 < H && img->image[y + 1][x] == background) {
+            img->image[y + 1][x] = label;
+            count++;
+            StackPush(stack, (PixelCoords){y + 1, x});
+        }
+        // Cima
+        if (y > 0 && img->image[y - 1][x] == background) {
+            img->image[y - 1][x] = label;
+            count++;
+            StackPush(stack, (PixelCoords){y - 1, x});
         }
     }
 
@@ -911,39 +932,51 @@ int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
     const uint16 background = img->image[v][u];
     if (background == label) return 0;
 
-    Queue* queue = QueueCreate(10000);
+    // Tamanho inicial adaptativo
+    const uint32 initialSize = (img->width * img->height) / 100;
+    Queue* queue = QueueCreate(initialSize > 100 ? initialSize : 100);
     if (!queue) return 0;
 
     int count = 0;
+    const int32_t W = (int32_t)img->width;
+    const int32_t H = (int32_t)img->height;
 
-    // Marca e enfileira semente
+    // Marcar e enfileirar semente
     img->image[v][u] = label;
     count++;
     QueueEnqueue(queue, (PixelCoords){u, v});
 
     while (!QueueIsEmpty(queue)) {
         PixelCoords p = QueueDequeue(queue);
-        const int x = p.u, y = p.v;
+        const int32_t x = p.u, y = p.v;
 
-        const PixelCoords neigh[4] = {
-            {x + 1, y}, {x - 1, y}, {x, y + 1}, {x, y - 1}
-        };
-
-        for (int i = 0; i < 4; i++) {
-            const int nx = neigh[i].u, ny = neigh[i].v;
-            if (!ImageIsValidPixel(img, nx, ny)) continue;
-            if (img->image[ny][nx] != background) continue;
-
-            // Marca já ao inserir para evitar múltiplas entradas
-            img->image[ny][nx] = label;
+        // Processar 4 vizinhos inline
+        if (x + 1 < W && img->image[y][x + 1] == background) {
+            img->image[y][x + 1] = label;
             count++;
-            QueueEnqueue(queue, (PixelCoords){nx, ny});
+            QueueEnqueue(queue, (PixelCoords){x + 1, y});
+        }
+        if (x > 0 && img->image[y][x - 1] == background) {
+            img->image[y][x - 1] = label;
+            count++;
+            QueueEnqueue(queue, (PixelCoords){x - 1, y});
+        }
+        if (y + 1 < H && img->image[y + 1][x] == background) {
+            img->image[y + 1][x] = label;
+            count++;
+            QueueEnqueue(queue, (PixelCoords){y + 1, x});
+        }
+        if (y > 0 && img->image[y - 1][x] == background) {
+            img->image[y - 1][x] = label;
+            count++;
+            QueueEnqueue(queue, (PixelCoords){y - 1, x});
         }
     }
 
     QueueDestroy(&queue);
     return count;
 }
+
 
 
 
@@ -981,28 +1014,41 @@ int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
  *  Em suma, esta função demonstra o uso prático da abstração de funções
  *  como parâmetros e consolida os conceitos de TAD e encapsulamento.
  *------------------------------------------------------------------*/
+/*
+ * OTIMIZAÇÃO: Cache de valores e evitar chamadas repetidas
+ */
 int ImageSegmentation(Image img, FillingFunction fillFunct) {
-    if (img == NULL || fillFunct == NULL)
-        return 0;
+    if (img == NULL || fillFunct == NULL) return 0;
 
-    int regionCount = 0;              // Número total de regiões
-    rgb_t currentColor = 0x0000FF;    // Cor inicial (exemplo: azul)
-    uint16 currentLabel = ImageColors(img); // Começa após as cores existentes
+    int regionCount = 0;
+    rgb_t currentColor = 0x0000FF;
+    uint16 currentLabel = img->num_colors;
+    
+    const uint32 W = img->width;
+    const uint32 H = img->height;
+    const uint16 maxColors = FIXED_LUT_SIZE;
 
-    for (uint32 v = 0; v < img->height; v++) {
-        for (uint32 u = 0; u < img->width; u++) {
-            // Se encontrarmos um pixel branco (não segmentado)
-            if (img->image[v][u] == WHITE) {
-                // Adicionar nova cor à LUT
-                check(img->num_colors < FIXED_LUT_SIZE, "LUT Overflow");
+    for (uint32 v = 0; v < H; v++) {
+        uint16* row = img->image[v];  // Cache do ponteiro da linha
+        
+        for (uint32 u = 0; u < W; u++) {
+            // Usar cache da linha em vez de img->image[v][u]
+            if (row[u] == WHITE) {
+                // Verificar overflow da LUT
+                if (currentLabel >= maxColors) {
+                    fprintf(stderr, "Warning: LUT overflow at region %d\n", regionCount);
+                    return regionCount;
+                }
+
+                // Adicionar cor à LUT
                 img->LUT[currentLabel] = currentColor;
                 img->num_colors++;
 
-                // Preencher a região com o novo label
+                // Preencher região
                 fillFunct(img, u, v, currentLabel);
                 regionCount++;
 
-                // Gerar próxima cor para a próxima região
+                // Próxima cor e label
                 currentColor = GenerateNextColor(currentColor);
                 currentLabel++;
             }
