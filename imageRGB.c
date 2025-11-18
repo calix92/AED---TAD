@@ -644,6 +644,9 @@ int ImageIsDifferent(const Image img1, const Image img2) {
  *  O pixel (v, u) da original vai para (u, height - 1 - v).
  *  Rotação 90° CW sem realocar LUT.
  *-----------------------------------------------------------------*/
+// ============================================
+// ImageRotate90CW - NOVA OTIMIZAÇÃO ⚡
+// ============================================
 Image ImageRotate90CW(const Image img) {
     if (img == NULL) return NULL;
 
@@ -652,15 +655,22 @@ Image ImageRotate90CW(const Image img) {
     Image rotated = ImageCreate(H, W);
     if (rotated == NULL) return NULL;
 
-    // Copiar LUT sem realocar
+    // OTIMIZAÇÃO: Copiar LUT com memcpy em vez de loop
     rotated->num_colors = img->num_colors;
-    for (uint16 i = 0; i < img->num_colors; i++)
-        rotated->LUT[i] = img->LUT[i];
+    if (img->num_colors > 0) {
+        const size_t lutBytes = (size_t)img->num_colors * sizeof(rgb_t);
+        memcpy(rotated->LUT, img->LUT, lutBytes);
+    }
 
-    // Rotação (v,u)->(u, H-1-v)
-    for (uint32 v = 0; v < H; v++)
-        for (uint32 u = 0; u < W; u++)
-            rotated->image[u][H - 1 - v] = img->image[v][u];
+    // OTIMIZAÇÃO: Cache de ponteiro de linha fonte
+    for (uint32 v = 0; v < H; v++) {
+        const uint16* srcRow = img->image[v];
+        const uint32 destCol = H - 1 - v;
+        
+        for (uint32 u = 0; u < W; u++) {
+            rotated->image[u][destCol] = srcRow[u];
+        }
+    }
 
     return rotated;
 }
@@ -679,6 +689,9 @@ Image ImageRotate90CW(const Image img) {
  *  O pixel (v, u) vai para (height - 1 - v, width - 1 - u).
  *  Rotação 180° CW sem realocar LUT.
  *-----------------------------------------------------------------*/
+// ============================================
+// ImageRotate180CW - NOVA OTIMIZAÇÃO ⚡
+// ============================================
 Image ImageRotate180CW(const Image img) {
     if (img == NULL) return NULL;
 
@@ -687,15 +700,22 @@ Image ImageRotate180CW(const Image img) {
     Image rotated = ImageCreate(W, H);
     if (rotated == NULL) return NULL;
 
-    // Copiar LUT sem realocar
+    // OTIMIZAÇÃO: Copiar LUT com memcpy em vez de loop
     rotated->num_colors = img->num_colors;
-    for (uint16 i = 0; i < img->num_colors; i++)
-        rotated->LUT[i] = img->LUT[i];
+    if (img->num_colors > 0) {
+        const size_t lutBytes = (size_t)img->num_colors * sizeof(rgb_t);
+        memcpy(rotated->LUT, img->LUT, lutBytes);
+    }
 
-    // (v,u)->(H-1-v, W-1-u)
-    for (uint32 v = 0; v < H; v++)
-        for (uint32 u = 0; u < W; u++)
-            rotated->image[H - 1 - v][W - 1 - u] = img->image[v][u];
+    // OTIMIZAÇÃO: Cache de ponteiros de linha
+    for (uint32 v = 0; v < H; v++) {
+        const uint16* srcRow = img->image[v];
+        uint16* destRow = rotated->image[H - 1 - v];
+        
+        for (uint32 u = 0; u < W; u++) {
+            destRow[W - 1 - u] = srcRow[u];
+        }
+    }
 
     return rotated;
 }
@@ -846,13 +866,15 @@ static int floodFillRecursive(Image img, int u, int v, uint16 background, uint16
  * OTIMIZAÇÃO: Processar vizinhos inline sem array temporário
  * Reduz alocações e melhora localidade de cache
  */
+// ============================================
+// ImageRegionFillingWithSTACK - NOVA OTIMIZAÇÃO ⚡
+// ============================================
 int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
     if (!ImageIsValidPixel(img, u, v)) return 0;
 
     const uint16 background = img->image[v][u];
     if (background == label) return 0;
 
-    // Tamanho inicial adaptativo baseado na imagem
     const uint32 initialSize = (img->width * img->height) / 100;
     Stack* stack = StackCreate(initialSize > 100 ? initialSize : 100);
     if (!stack) return 0;
@@ -861,7 +883,6 @@ int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
     const int32_t W = (int32_t)img->width;
     const int32_t H = (int32_t)img->height;
 
-    // Marcar e empilhar semente
     img->image[v][u] = label;
     count++;
     StackPush(stack, (PixelCoords){u, v});
@@ -870,30 +891,45 @@ int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
         PixelCoords p = StackPop(stack);
         const int32_t x = p.u, y = p.v;
 
-        // Processar 4 vizinhos inline (evita array temporário)
+        // OTIMIZAÇÃO: Usar ponteiro direto para reduzir indireções
         // Direita
-        if (x + 1 < W && img->image[y][x + 1] == background) {
-            img->image[y][x + 1] = label;
-            count++;
-            StackPush(stack, (PixelCoords){x + 1, y});
+        if (x + 1 < W) {
+            uint16* pixel = &img->image[y][x + 1];
+            if (*pixel == background) {
+                *pixel = label;
+                count++;
+                StackPush(stack, (PixelCoords){x + 1, y});
+            }
         }
+        
         // Esquerda
-        if (x > 0 && img->image[y][x - 1] == background) {
-            img->image[y][x - 1] = label;
-            count++;
-            StackPush(stack, (PixelCoords){x - 1, y});
+        if (x > 0) {
+            uint16* pixel = &img->image[y][x - 1];
+            if (*pixel == background) {
+                *pixel = label;
+                count++;
+                StackPush(stack, (PixelCoords){x - 1, y});
+            }
         }
+        
         // Baixo
-        if (y + 1 < H && img->image[y + 1][x] == background) {
-            img->image[y + 1][x] = label;
-            count++;
-            StackPush(stack, (PixelCoords){y + 1, x});
+        if (y + 1 < H) {
+            uint16* pixel = &img->image[y + 1][x];
+            if (*pixel == background) {
+                *pixel = label;
+                count++;
+                StackPush(stack, (PixelCoords){x, y + 1});
+            }
         }
+        
         // Cima
-        if (y > 0 && img->image[y - 1][x] == background) {
-            img->image[y - 1][x] = label;
-            count++;
-            StackPush(stack, (PixelCoords){y - 1, x});
+        if (y > 0) {
+            uint16* pixel = &img->image[y - 1][x];
+            if (*pixel == background) {
+                *pixel = label;
+                count++;
+                StackPush(stack, (PixelCoords){x, y - 1});
+            }
         }
     }
 
@@ -926,13 +962,15 @@ int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
  * 
  *  BFS “sem duplicados”.
  *------------------------------------------------------------------*/
+// ============================================
+// ImageRegionFillingWithQUEUE - NOVA OTIMIZAÇÃO ⚡
+// ============================================
 int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
     if (!ImageIsValidPixel(img, u, v)) return 0;
 
     const uint16 background = img->image[v][u];
     if (background == label) return 0;
 
-    // Tamanho inicial adaptativo
     const uint32 initialSize = (img->width * img->height) / 100;
     Queue* queue = QueueCreate(initialSize > 100 ? initialSize : 100);
     if (!queue) return 0;
@@ -941,7 +979,6 @@ int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
     const int32_t W = (int32_t)img->width;
     const int32_t H = (int32_t)img->height;
 
-    // Marcar e enfileirar semente
     img->image[v][u] = label;
     count++;
     QueueEnqueue(queue, (PixelCoords){u, v});
@@ -950,33 +987,51 @@ int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
         PixelCoords p = QueueDequeue(queue);
         const int32_t x = p.u, y = p.v;
 
-        // Processar 4 vizinhos inline
-        if (x + 1 < W && img->image[y][x + 1] == background) {
-            img->image[y][x + 1] = label;
-            count++;
-            QueueEnqueue(queue, (PixelCoords){x + 1, y});
+        // OTIMIZAÇÃO: Usar ponteiro direto
+        // Direita
+        if (x + 1 < W) {
+            uint16* pixel = &img->image[y][x + 1];
+            if (*pixel == background) {
+                *pixel = label;
+                count++;
+                QueueEnqueue(queue, (PixelCoords){x + 1, y});
+            }
         }
-        if (x > 0 && img->image[y][x - 1] == background) {
-            img->image[y][x - 1] = label;
-            count++;
-            QueueEnqueue(queue, (PixelCoords){x - 1, y});
+        
+        // Esquerda
+        if (x > 0) {
+            uint16* pixel = &img->image[y][x - 1];
+            if (*pixel == background) {
+                *pixel = label;
+                count++;
+                QueueEnqueue(queue, (PixelCoords){x - 1, y});
+            }
         }
-        if (y + 1 < H && img->image[y + 1][x] == background) {
-            img->image[y + 1][x] = label;
-            count++;
-            QueueEnqueue(queue, (PixelCoords){y + 1, x});
+        
+        // Baixo
+        if (y + 1 < H) {
+            uint16* pixel = &img->image[y + 1][x];
+            if (*pixel == background) {
+                *pixel = label;
+                count++;
+                QueueEnqueue(queue, (PixelCoords){x, y + 1});
+            }
         }
-        if (y > 0 && img->image[y - 1][x] == background) {
-            img->image[y - 1][x] = label;
-            count++;
-            QueueEnqueue(queue, (PixelCoords){y - 1, x});
+        
+        // Cima
+        if (y > 0) {
+            uint16* pixel = &img->image[y - 1][x];
+            if (*pixel == background) {
+                *pixel = label;
+                count++;
+                QueueEnqueue(queue, (PixelCoords){x, y - 1});
+            }
         }
     }
 
     QueueDestroy(&queue);
     return count;
 }
-
 
 
 
