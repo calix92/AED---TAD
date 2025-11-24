@@ -203,4 +203,8 @@ typedef int (*FillingFunction)(Image img, int u, int v, uint16 label);
 /// Returns the number of image regions found.
 int ImageSegmentation(Image img, FillingFunction fillFunct);
 
+//Função auxiliar criada por nós
+void ImageSetPixel(Image img, int u, int v, uint16 label);
+
+
 #endif

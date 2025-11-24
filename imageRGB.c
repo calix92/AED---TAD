@@ -792,6 +792,21 @@ int ImageRegionFillingRecursive(Image img, int u, int v, uint16 label) {
     // Guardar a cor original (background)
     uint16 background = img->image[v][u];
 
+    // Se background == label, temos de criar um novo label
+    if (background == label) {
+      uint16 newLabel = img->num_colors;
+
+    // Garantir que não excedemos a LUT
+    if (newLabel < FIXED_LUT_SIZE) {
+        // Criar nova cor baseada na cor original
+        img->LUT[newLabel] = GenerateNextColor(img->LUT[background]);
+        img->num_colors++;
+
+        label = newLabel;   // Usar este novo label no flood-fill
+      }
+    }
+
+
     // Se o pixel já tem a nova cor, não há nada a fazer
     if (background == label)
         return 0;
@@ -873,6 +888,20 @@ int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
     if (!ImageIsValidPixel(img, u, v)) return 0;
 
     const uint16 background = img->image[v][u];
+    // Se background == label, temos de criar um novo label
+    if (background == label) {
+      uint16 newLabel = img->num_colors;
+
+      // Garantir que não excedemos a LUT
+    if (newLabel < FIXED_LUT_SIZE) {
+        // Criar nova cor baseada na cor original
+        img->LUT[newLabel] = GenerateNextColor(img->LUT[background]);
+        img->num_colors++;
+
+        label = newLabel;   // Usar este novo label no flood-fill
+      }
+    }
+
     if (background == label) return 0;
 
     const uint32 initialSize = (img->width * img->height) / 100;
@@ -969,6 +998,20 @@ int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
     if (!ImageIsValidPixel(img, u, v)) return 0;
 
     const uint16 background = img->image[v][u];
+    // Se background == label, temos de criar um novo label
+    if (background == label) {
+    uint16 newLabel = img->num_colors;
+
+    // Garantir que não excedemos a LUT
+    if (newLabel < FIXED_LUT_SIZE) {
+        // Criar nova cor baseada na cor original
+        img->LUT[newLabel] = GenerateNextColor(img->LUT[background]);
+        img->num_colors++;
+
+        label = newLabel;   // Usar este novo label no flood-fill
+      }
+    }
+
     if (background == label) return 0;
 
     const uint32 initialSize = (img->width * img->height) / 100;
@@ -1074,44 +1117,61 @@ int ImageSegmentation(Image img, FillingFunction fillFunct) {
 
     int regionCount = 0;
 
-    // Garantir que começamos a gerar cores a partir da última da LUT
     rgb_t currentColor = img->LUT[img->num_colors - 1];
-
-    // Primeiro novo label disponível
     uint16 currentLabel = img->num_colors;
 
     const uint32 W = img->width;
     const uint32 H = img->height;
 
     for (uint32 v = 0; v < H; v++) {
-        uint16* row = img->image[v];   // cache da linha
+        uint16* row = img->image[v];
 
         for (uint32 u = 0; u < W; u++) {
 
-            // Só inicia flood fill em pixéis completamente brancos
-            if (row[u] == WHITE) {
+            // ---------------------------------------------------------
+            // 1) QUALQUER pixel que NÃO seja WHITE (0) é obstáculo
+            //    Isto força o Chess a ter 4 regiões e impede fill
+            //    de atravessar casas coloridas.
+            // ---------------------------------------------------------
+            if (row[u] != WHITE)
+                continue;
 
-                // Prevenir ultrapassar a LUT
-                if (currentLabel >= FIXED_LUT_SIZE)
-                    return regionCount;
+            // ---------------------------------------------------------
+            // 2) Só iniciar uma nova região se este pixel for o
+            //    "primeiro" dela (evita duplicação)
+            // ---------------------------------------------------------
+            if ((u > 0  && row[u - 1] == WHITE) ||
+                (v > 0  && img->image[v - 1][u] == WHITE))
+                continue;
 
-                // Gerar nova cor SEM substituir preto/branco
-                currentColor = GenerateNextColor(currentColor);
+            // ---------------------------------------------------------
+            // 3) Preparar novo label e nova cor para esta região
+            // ---------------------------------------------------------
+            if (currentLabel >= FIXED_LUT_SIZE)
+                return regionCount;
 
-                // Guardar nova cor na LUT
-                img->LUT[currentLabel] = currentColor;
+            currentColor = GenerateNextColor(currentColor);
+            img->LUT[currentLabel] = currentColor;
+            img->num_colors = currentLabel + 1;
 
-                // Atualizar contador de cores
-                img->num_colors = currentLabel + 1;
+            // ---------------------------------------------------------
+            // 4) Preencher região de WHITE
+            // ---------------------------------------------------------
+            fillFunct(img, u, v, currentLabel);
 
-                // Preencher região com o novo label
-                fillFunct(img, u, v, currentLabel);
-
-                regionCount++;
-                currentLabel++;
-            }
+            regionCount++;
+            currentLabel++;
         }
     }
 
     return regionCount;
+}
+
+
+
+//Função Auxiliar
+void ImageSetPixel(Image img, int u, int v, uint16 label){
+  if (ImageIsValidPixel(img, u, v)) {
+      img->image[v][u] = label;
+  }
 }

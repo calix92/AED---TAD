@@ -167,11 +167,12 @@ void test_RegionFillingRecursive() {
     Image img2 = ImageCreate(40, 40);
     // Criar borda preta
     for (uint32 i = 0; i < 40; i++) {
-        ImageRegionFillingRecursive(img2, i, 0, BLACK);
-        ImageRegionFillingRecursive(img2, i, 39, BLACK);
-        ImageRegionFillingRecursive(img2, 0, i, BLACK);
-        ImageRegionFillingRecursive(img2, 39, i, BLACK);
-    }
+    ImageSetPixel(img2, i, 0,   BLACK);  // linha de cima
+    ImageSetPixel(img2, i, 39,  BLACK);  // linha de baixo
+    ImageSetPixel(img2, 0,   i, BLACK);  // coluna esquerda
+    ImageSetPixel(img2, 39,  i, BLACK);  // coluna direita
+}
+
     
     int count3 = ImageRegionFillingRecursive(img2, 20, 20, 2);
     test("Região parcial 38×38 = 1444 pixels", count3 == 1444);
