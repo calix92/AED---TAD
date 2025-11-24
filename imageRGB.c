@@ -1074,45 +1074,41 @@ int ImageSegmentation(Image img, FillingFunction fillFunct) {
 
     int regionCount = 0;
 
-    // A cor inicial é a última cor da LUT atual.
-    // Assim, evitamos colisões com cores já existentes.
+    // Garantir que começamos a gerar cores a partir da última da LUT
     rgb_t currentColor = img->LUT[img->num_colors - 1];
 
-    // O primeiro novo label será exatamente o próximo livre
+    // Primeiro novo label disponível
     uint16 currentLabel = img->num_colors;
 
     const uint32 W = img->width;
     const uint32 H = img->height;
 
     for (uint32 v = 0; v < H; v++) {
-        uint16* row = img->image[v];  // cache da linha
+        uint16* row = img->image[v];   // cache da linha
 
         for (uint32 u = 0; u < W; u++) {
 
-            // Apenas regiões que ainda estão a WHITE (0)
+            // Só inicia flood fill em pixéis completamente brancos
             if (row[u] == WHITE) {
 
-                // Verificar se ainda há espaço na LUT
-                if (currentLabel >= FIXED_LUT_SIZE) {
-                    fprintf(stderr, "Warning: LUT overflow at region %d\n", regionCount);
+                // Prevenir ultrapassar a LUT
+                if (currentLabel >= FIXED_LUT_SIZE)
                     return regionCount;
-                }
 
-                // Gerar nova cor diferente da anterior
+                // Gerar nova cor SEM substituir preto/branco
                 currentColor = GenerateNextColor(currentColor);
 
                 // Guardar nova cor na LUT
                 img->LUT[currentLabel] = currentColor;
 
-                // Atualizar número total de cores
+                // Atualizar contador de cores
                 img->num_colors = currentLabel + 1;
 
-                // Preencher a região com o novo label
+                // Preencher região com o novo label
                 fillFunct(img, u, v, currentLabel);
 
-                // Avançar para o próximo label
-                currentLabel++;
                 regionCount++;
+                currentLabel++;
             }
         }
     }
