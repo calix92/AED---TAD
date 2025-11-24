@@ -1069,43 +1069,50 @@ int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
  *  Em suma, esta função demonstra o uso prático da abstração de funções
  *  como parâmetros e consolida os conceitos de TAD e encapsulamento.
  *------------------------------------------------------------------*/
-/*
- * OTIMIZAÇÃO: Cache de valores e evitar chamadas repetidas
- */
 int ImageSegmentation(Image img, FillingFunction fillFunct) {
     if (img == NULL || fillFunct == NULL) return 0;
 
     int regionCount = 0;
-    rgb_t currentColor = 0x0000FF;
+
+    // A cor inicial é a última cor da LUT atual.
+    // Assim, evitamos colisões com cores já existentes.
+    rgb_t currentColor = img->LUT[img->num_colors - 1];
+
+    // O primeiro novo label será exatamente o próximo livre
     uint16 currentLabel = img->num_colors;
-    
+
     const uint32 W = img->width;
     const uint32 H = img->height;
-    const uint16 maxColors = FIXED_LUT_SIZE;
 
     for (uint32 v = 0; v < H; v++) {
-        uint16* row = img->image[v];  // Cache do ponteiro da linha
-        
+        uint16* row = img->image[v];  // cache da linha
+
         for (uint32 u = 0; u < W; u++) {
-            // Usar cache da linha em vez de img->image[v][u]
+
+            // Apenas regiões que ainda estão a WHITE (0)
             if (row[u] == WHITE) {
-                // Verificar overflow da LUT
-                if (currentLabel >= maxColors) {
+
+                // Verificar se ainda há espaço na LUT
+                if (currentLabel >= FIXED_LUT_SIZE) {
                     fprintf(stderr, "Warning: LUT overflow at region %d\n", regionCount);
                     return regionCount;
                 }
 
-                // Adicionar cor à LUT
-                img->LUT[currentLabel] = currentColor;
-                img->num_colors++;
-
-                // Preencher região
-                fillFunct(img, u, v, currentLabel);
-                regionCount++;
-
-                // Próxima cor e label
+                // Gerar nova cor diferente da anterior
                 currentColor = GenerateNextColor(currentColor);
+
+                // Guardar nova cor na LUT
+                img->LUT[currentLabel] = currentColor;
+
+                // Atualizar número total de cores
+                img->num_colors = currentLabel + 1;
+
+                // Preencher a região com o novo label
+                fillFunct(img, u, v, currentLabel);
+
+                // Avançar para o próximo label
                 currentLabel++;
+                regionCount++;
             }
         }
     }
