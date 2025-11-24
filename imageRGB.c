@@ -1113,50 +1113,58 @@ int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
  *  como parâmetros e consolida os conceitos de TAD e encapsulamento.
  *------------------------------------------------------------------*/
 int ImageSegmentation(Image img, FillingFunction fillFunct) {
-    if (img == NULL || fillFunct == NULL) return 0;
+    if (img == NULL || fillFunct == NULL)
+        return 0;
 
+    // ============================================================
+    // NORMALIZAÇÃO (garante 0 = branco, 1 = preto)
+    // ============================================================
+    img->LUT[WHITE] = 0xFFFFFF;  // label 0
+    img->LUT[BLACK] = 0x000000;  // label 1
+    img->num_colors = 2;
+
+    // Limpar qualquer pixel com labels lixo (>1)
+    for (uint32 v = 0; v < img->height; v++) {
+        for (uint32 u = 0; u < img->width; u++) {
+            uint16 px = img->image[v][u];
+            if (px != WHITE && px != BLACK)
+                img->image[v][u] = BLACK;
+        }
+    }
+
+    // Agora sim: começar segmentação
+    uint16 currentLabel = 2;
+    rgb_t currentColor = 0x000000;  // GenerateNextColor() vai avançar daqui
     int regionCount = 0;
-
-    rgb_t currentColor = img->LUT[img->num_colors - 1];
-    uint16 currentLabel = img->num_colors;
 
     const uint32 W = img->width;
     const uint32 H = img->height;
 
+    // ============================================================
+    // SEGMENTAÇÃO
+    // ============================================================
     for (uint32 v = 0; v < H; v++) {
-        uint16* row = img->image[v];
+        uint16 *row = img->image[v];
 
         for (uint32 u = 0; u < W; u++) {
 
-            // ---------------------------------------------------------
-            // 1) QUALQUER pixel que NÃO seja WHITE (0) é obstáculo
-            //    Isto força o Chess a ter 4 regiões e impede fill
-            //    de atravessar casas coloridas.
-            // ---------------------------------------------------------
-            if (row[u] != WHITE)
+            uint16 px = row[u];
+
+            // Só segmentamos os dois labels originais:
+            // WHITE (0) e BLACK (1)
+            // Se px >= 2 → já segmentado → saltar
+            if (px != WHITE && px != BLACK)
                 continue;
 
-            // ---------------------------------------------------------
-            // 2) Só iniciar uma nova região se este pixel for o
-            //    "primeiro" dela (evita duplicação)
-            // ---------------------------------------------------------
-            if ((u > 0  && row[u - 1] == WHITE) ||
-                (v > 0  && img->image[v - 1][u] == WHITE))
-                continue;
-
-            // ---------------------------------------------------------
-            // 3) Preparar novo label e nova cor para esta região
-            // ---------------------------------------------------------
             if (currentLabel >= FIXED_LUT_SIZE)
                 return regionCount;
 
+            // Nova cor única para esta região
             currentColor = GenerateNextColor(currentColor);
             img->LUT[currentLabel] = currentColor;
             img->num_colors = currentLabel + 1;
 
-            // ---------------------------------------------------------
-            // 4) Preencher região de WHITE
-            // ---------------------------------------------------------
+            // Flood fill com o novo label
             fillFunct(img, u, v, currentLabel);
 
             regionCount++;
@@ -1166,6 +1174,7 @@ int ImageSegmentation(Image img, FillingFunction fillFunct) {
 
     return regionCount;
 }
+
 
 
 
