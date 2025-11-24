@@ -5,6 +5,28 @@
 //
 // AED 2025 - DETI/UA
 
+/*------------------------------------------------------------------
+ * testOptimized.c
+ *
+ * Conjunto de testes desenvolvido para validar:
+ *   - correção funcional das 8 funções otimizadas
+ *   - consistência entre versões recursive / stack / queue
+ *   - comportamento geométrico das rotações
+ *   - segmentação correta em padrões artificiais e PBM reais
+ *
+ * Este ficheiro complementa o imageRGBTest.c do stor e cobre cenários
+ * que não estavam incluídos no original — especialmente:
+ *   - integridade das deep copies
+ *   - igualdade estrutural pós-transformações repetidas
+ *   - teste exaustivo das 3 variantes de Flood Fill
+ *   - segmentação rigorosa em imagens definidas por regras
+ *
+ * Inclui ainda um modo --perf para medir instruções contadas pelo
+ * módulo de instrumentação, permitindo comparação direta entre
+ * implementações otimizadas.
+ *-----------------------------------------------------------------*/
+
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
