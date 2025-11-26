@@ -9,8 +9,8 @@
 
 | NMec | Nome | Email |
 |------|------|-------|
-| 125043 | David Caride Cálix | david.calix@ua.pt |
-| XXXXXX | Diogo André Ruivo | diogo.ruivo@ua.pt |
+| 125043 | David Caride Cálix | dcalix@ua.pt |
+| 126498 | Diogo André Ruivo | diogo.ruivo@ua.pt |
 
 ---
 
@@ -396,9 +396,9 @@ ImageDestroy(&img);  // liberta memória e define img = NULL
 ### Output dos Testes
 
 ```
-════════════════════════════════════════════════════════
+--------------------------------------------------------
      TESTES DAS 8 FUNÇÕES OTIMIZADAS - imageRGB.c        
-════════════════════════════════════════════════════════
+--------------------------------------------------------
 
 === TESTE 1: ImageCopy ===
   ✓ Copy não é NULL
@@ -410,11 +410,11 @@ ImageDestroy(&img);  // liberta memória e define img = NULL
 
 [... 27 testes adicionais ...]
 
-════════════════════════════════════════════════════════
+--------------------------------------------------------
   RESUMO DOS TESTES                                       
   Passaram: 33 / 33                                       
   Status: TODOS OS TESTES PASSARAM!                    
-════════════════════════════════════════════════════════
+--------------------------------------------------------
 ```
 
 ### Ficheiros Gerados

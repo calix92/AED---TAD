@@ -350,7 +350,7 @@ int main(int argc, char* argv[]) {
     program_name = argv[0];
     
     printf("╔══════════════════════════════════════════════════════════╗\n");
-    printf("║     TESTES DAS 8 FUNÇÕES OTIMIZADAS - imageRGB.c        ║\n");
+    printf("║     TESTES DAS 8 FUNÇÕES OTIMIZADAS - imageRGB.c         ║\n");
     printf("╚══════════════════════════════════════════════════════════╝\n");
     
     ImageInit();
@@ -377,9 +377,9 @@ int main(int argc, char* argv[]) {
            tests_passed, tests_total);
     
     if (tests_passed == tests_total) {
-        printf("║  Status: ✓ TODOS OS TESTES PASSARAM!                    ║\n");
+        printf("║  Status: ✓ TODOS OS TESTES PASSARAM!                     ║\n");
     } else {
-        printf("║  Status: ✗ ALGUNS TESTES FALHARAM                       ║\n");
+        printf("║  Status: ✗ ALGUNS TESTES FALHARAM                        ║\n");
     }
     
     printf("╠══════════════════════════════════════════════════════════╣\n");

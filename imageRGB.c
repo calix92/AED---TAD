@@ -13,10 +13,10 @@
 // Student authors (fill in below):
 // NMec: 125043
 // Name: David Caride Cálix
-// NMec:
+// NMec: 126498
 // Name:Diogo André Ruivo
 //
-// Date:
+// Date: 24/11/2025
 //
 
 #include "imageRGB.h"

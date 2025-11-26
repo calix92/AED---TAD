@@ -16,6 +16,7 @@ int ImageRegionFillingWithQUEUE
 
 ImageSegmentation
 
+(auxiliar não pedida pelo professor, mas que dá jeito) ---------> void ImageSetPixel (adicionada ao codigo normal e à interface)
 
 
 
