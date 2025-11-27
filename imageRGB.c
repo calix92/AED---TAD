@@ -16,7 +16,7 @@
 // NMec: 126498
 // Name:Diogo André Ruivo
 //
-// Date: 24/11/2025
+// Date: 26/11/2025
 //
 
 #include "imageRGB.h"
@@ -286,7 +286,7 @@ void ImageDestroy(Image* imgp) {
  * A função usa memcpy para copiar linhas inteiras, garantindo
  * desempenho elevado e total independência entre a original e a cópia.
  *
- * Retorna: nova imagem completamente independente.
+ * Retorna nova imagem completamente independente.
  *-----------------------------------------------------------------*/
 Image ImageCopy(const Image img) {
     if (img == NULL) return NULL;
@@ -301,7 +301,7 @@ Image ImageCopy(const Image img) {
         memcpy(copy->LUT, img->LUT, lutBytes);
     }
 
-    // Copiar pixels linha por linha (muito mais rápido!)
+    // Copiar pixels linha por linha (muito mais rápido)
     const size_t rowBytes = (size_t)img->width * sizeof(uint16);
     for (uint32 v = 0; v < img->height; v++) {
         memcpy(copy->image[v], img->image[v], rowBytes);
@@ -580,9 +580,8 @@ uint16 ImageColors(const Image img) {
  * Usa early-return para acelerar a deteção de diferenças e contabiliza
  * acessos a pixels via PIXMEM. Implementação eficiente e estável.
  *
- * Retorna: 1 se forem iguais, 0 caso contrário.
+ * Retorna 1 se forem iguais, 0 caso contrário.
  *-----------------------------------------------------------------*/
-
 int ImageIsEqual(const Image img1, const Image img2) {
     if (img1 == NULL || img2 == NULL) return 0;
     if (img1 == img2) return 1;
@@ -597,7 +596,7 @@ int ImageIsEqual(const Image img1, const Image img2) {
         if (memcmp(img1->LUT, img2->LUT, lutBytes) != 0) return 0;
     }
 
-    // Comparar pixels linha por linha com memcmp (muito mais rápido!)
+    // Comparar pixels linha por linha com memcmp (muito mais rápido)
     const size_t rowBytes = (size_t)W * sizeof(uint16);
     for (uint32 v = 0; v < H; v++) {
         if (memcmp(img1->image[v], img2->image[v], rowBytes) != 0) {
@@ -617,7 +616,6 @@ int ImageIsEqual(const Image img1, const Image img2) {
  * Wrapper simples que devolve o inverso de ImageIsEqual.
  * Mantém semântica clara e evita repetição de lógica.
  *-----------------------------------------------------------------*/
-
 int ImageIsDifferent(const Image img1, const Image img2) {
   assert(img1 != NULL);
   assert(img2 != NULL);
@@ -637,7 +635,6 @@ int ImageIsDifferent(const Image img1, const Image img2) {
  *
  * Retorna imagem nova, sem alterar a original.
  *-----------------------------------------------------------------*/
-
 Image ImageRotate90CW(const Image img) {
     if (img == NULL) return NULL;
 
@@ -646,14 +643,14 @@ Image ImageRotate90CW(const Image img) {
     Image rotated = ImageCreate(H, W);
     if (rotated == NULL) return NULL;
 
-    // OTIMIZAÇÃO: Copiar LUT com memcpy em vez de loop
+    // Copia LUT com memcpy em vez de loop
     rotated->num_colors = img->num_colors;
     if (img->num_colors > 0) {
         const size_t lutBytes = (size_t)img->num_colors * sizeof(rgb_t);
         memcpy(rotated->LUT, img->LUT, lutBytes);
     }
 
-    // OTIMIZAÇÃO: Cache de ponteiro de linha fonte
+    // Cache de ponteiro de linha fonte
     for (uint32 v = 0; v < H; v++) {
         const uint16* srcRow = img->image[v];
         const uint32 destCol = H - 1 - v;
@@ -679,7 +676,6 @@ Image ImageRotate90CW(const Image img) {
  *
  * Retorna a versão rotacionada sem modificar a original.
  *-----------------------------------------------------------------*/
-
 Image ImageRotate180CW(const Image img) {
     if (img == NULL) return NULL;
 
@@ -688,14 +684,14 @@ Image ImageRotate180CW(const Image img) {
     Image rotated = ImageCreate(W, H);
     if (rotated == NULL) return NULL;
 
-    // OTIMIZAÇÃO: Copiar LUT com memcpy em vez de loop
+    // Copiar LUT com memcpy em vez de loop
     rotated->num_colors = img->num_colors;
     if (img->num_colors > 0) {
         const size_t lutBytes = (size_t)img->num_colors * sizeof(rgb_t);
         memcpy(rotated->LUT, img->LUT, lutBytes);
     }
 
-    // OTIMIZAÇÃO: Cache de ponteiros de linha
+    // Cache de ponteiros de linha
     for (uint32 v = 0; v < H; v++) {
         const uint16* srcRow = img->image[v];
         uint16* destRow = rotated->image[H - 1 - v];
@@ -735,6 +731,7 @@ int ImageIsValidPixel(const Image img, int u, int v) {
 /// Each function carries out a different version of the algorithm.
 
 /// Region growing using the recursive flood-filling algorithm.
+
 /*------------------------------------------------------------------
  * ImageRegionFillingRecursive
  * Implementação recursiva do algoritmo Flood Fill (4 vizinhos).
@@ -749,7 +746,6 @@ int ImageIsValidPixel(const Image img, int u, int v) {
  *
  * Retorna: número total de píxeis preenchidos.
  *-----------------------------------------------------------------*/
-
 static int floodFillRecursive(Image img, int u, int v, uint16 background, uint16 label);
 
 int ImageRegionFillingRecursive(Image img, int u, int v, uint16 label) {
@@ -825,9 +821,8 @@ static int floodFillRecursive(Image img, int u, int v, uint16 background, uint16
  * Processa vizinhos inline para maximizar localidade de dados.
  * Resultado é idêntico à versão recursiva.
  *
- * Retorna: número de píxeis preenchidos.
+ * Retorna o número de píxeis preenchidos.
  *-----------------------------------------------------------------*/
-
 int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
     if (!ImageIsValidPixel(img, u, v)) return 0;
 
@@ -836,7 +831,7 @@ int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
     if (background == label) {
       uint16 newLabel = img->num_colors;
 
-      // Garantir que não excedemos a LUT
+    // Garantir que não excedemos a LUT
     if (newLabel < FIXED_LUT_SIZE) {
         // Criar nova cor baseada na cor original
         img->LUT[newLabel] = GenerateNextColor(img->LUT[background]);
@@ -864,7 +859,7 @@ int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
         PixelCoords p = StackPop(stack);
         const int32_t x = p.u, y = p.v;
 
-        // OTIMIZAÇÃO: Usar ponteiro direto para reduzir indireções
+        // Usar ponteiro direto para reduzir indireções
         // Direita
         if (x + 1 < W) {
             uint16* pixel = &img->image[y][x + 1];
@@ -922,9 +917,8 @@ int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
  *
  * Estrutura de dados usada: TAD Queue.
  *
- * Retorna: número total de píxeis preenchidos.
+ * Retorna o número total de píxeis preenchidos.
  *-----------------------------------------------------------------*/
-
 int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
     if (!ImageIsValidPixel(img, u, v)) return 0;
 
@@ -961,7 +955,7 @@ int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
         PixelCoords p = QueueDequeue(queue);
         const int32_t x = p.u, y = p.v;
 
-        // OTIMIZAÇÃO: Usar ponteiro direto
+        // Usar ponteiro direto
         // Direita
         if (x + 1 < W) {
             uint16* pixel = &img->image[y][x + 1];
@@ -1023,16 +1017,13 @@ int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
  *
  * O algoritmo é modular e suporta as 3 variantes de Flood Fill.
  *
- * Retorna: número de regiões encontradas.
+ * Retorna o número de regiões encontradas.
  *-----------------------------------------------------------------*/
-
 int ImageSegmentation(Image img, FillingFunction fillFunct) {
     if (img == NULL || fillFunct == NULL)
         return 0;
 
-    // ============================================================
-    // NORMALIZAÇÃO (garante 0 = branco, 1 = preto)
-    // ============================================================
+    // Normalização: garante 0 = branco, 1 = preto)
     img->LUT[WHITE] = 0xFFFFFF;  // label 0
     img->LUT[BLACK] = 0x000000;  // label 1
     img->num_colors = 2;
@@ -1046,7 +1037,7 @@ int ImageSegmentation(Image img, FillingFunction fillFunct) {
         }
     }
 
-    // Agora sim: começar segmentação
+    // Começar segmentação
     uint16 currentLabel = 2;
     rgb_t currentColor = 0x000000;  // GenerateNextColor() vai avançar daqui
     int regionCount = 0;
@@ -1054,9 +1045,7 @@ int ImageSegmentation(Image img, FillingFunction fillFunct) {
     const uint32 W = img->width;
     const uint32 H = img->height;
 
-    // ============================================================
-    // SEGMENTAÇÃO
-    // ============================================================
+    // segmentação
     for (uint32 v = 0; v < H; v++) {
         uint16 *row = img->image[v];
 
@@ -1066,7 +1055,7 @@ int ImageSegmentation(Image img, FillingFunction fillFunct) {
 
             // Só segmentamos os dois labels originais:
             // WHITE (0) e BLACK (1)
-            // Se px >= 2 → já segmentado → saltar
+            // Se px >= 2 -> já segmentado -> saltar
             if (px != WHITE && px != BLACK)
                 continue;
 
@@ -1100,7 +1089,6 @@ int ImageSegmentation(Image img, FillingFunction fillFunct) {
  *
  * Mantém a consistência do acesso aos dados e evita duplicação de código.
  *-----------------------------------------------------------------*/
-
 void ImageSetPixel(Image img, int u, int v, uint16 label){
   if (ImageIsValidPixel(img, u, v)) {
       img->image[v][u] = label;

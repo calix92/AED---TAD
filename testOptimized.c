@@ -2,6 +2,8 @@
 //
 // Compila com: gcc -Wall -Wextra -O2 -g -o testOptimized testOptimized.c imageRGB.c instrumentation.c error.c PixelCoords.c PixelCoordsQueue.c PixelCoordsStack.c
 // Executa: ./testOptimized
+// OU
+// ./testOptimized --perf (para teste de performance)
 //
 // AED 2025 - DETI/UA
 
@@ -14,7 +16,7 @@
  *   - comportamento geométrico das rotações
  *   - segmentação correta em padrões artificiais e PBM reais
  *
- * Este ficheiro complementa o imageRGBTest.c do stor e cobre cenários
+ * Este ficheiro complementa o imageRGBTest.c do Professor e cobre cenários
  * que não estavam incluídos no original — especialmente:
  *   - integridade das deep copies
  *   - igualdade estrutural pós-transformações repetidas
@@ -51,9 +53,9 @@ void test(const char* name, int condition) {
     tests_total++;
     if (condition) {
         tests_passed++;
-        printf("  ✓ %s\n", name);
+        printf("  [x] %s\n", name);
     } else {
-        printf("  ✗ FALHOU: %s\n", name);
+        printf("  [ ] FALHOU: %s\n", name);
     }
 }
 
@@ -152,10 +154,10 @@ void test_ImageRotate180CW() {
     Image r2 = ImageRotate180CW(rotated);
     test("2 rotações 180° = original", ImageIsEqual(original, r2));
     
-    // 180° = 2×90°
+    // 180° = 2x90°
     Image r90_1 = ImageRotate90CW(original);
     Image r90_2 = ImageRotate90CW(r90_1);
-    test("Rotação 180° = 2×90°", ImageIsEqual(rotated, r90_2));
+    test("Rotação 180° = 2x90°", ImageIsEqual(rotated, r90_2));
     
     ImageSavePPM(rotated, "test_rotate180.ppm");
     printf("  → Ficheiro salvo: test_rotate180.ppm\n");
@@ -177,7 +179,7 @@ void test_RegionFillingRecursive() {
     Image img = ImageCreate(30, 30);
     int count = ImageRegionFillingRecursive(img, 15, 15, 2);
     
-    test("Preencheu 900 pixels (30×30)", count == 900);
+    test("Preencheu 900 pixels (30x30)", count == 900);
     
     // Teste 5.2: Preencher região já preenchida = 0
     int count2 = ImageRegionFillingRecursive(img, 15, 15, 2);
@@ -197,7 +199,7 @@ void test_RegionFillingRecursive() {
 
     
     int count3 = ImageRegionFillingRecursive(img2, 20, 20, 2);
-    test("Região parcial 38×38 = 1444 pixels", count3 == 1444);
+    test("Região parcial 38x38 = 1444 pixels", count3 == 1444);
     
     ImageDestroy(&img2);
 }
@@ -211,7 +213,7 @@ void test_RegionFillingWithSTACK() {
     Image img = ImageCreate(30, 30);
     int count = ImageRegionFillingWithSTACK(img, 15, 15, 2);
     
-    test("Preencheu 900 pixels (30×30)", count == 900);
+    test("Preencheu 900 pixels (30x30)", count == 900);
     
     // Comparar com Recursive
     Image img_rec = ImageCreate(30, 30);
@@ -232,7 +234,7 @@ void test_RegionFillingWithQUEUE() {
     Image img = ImageCreate(30, 30);
     int count = ImageRegionFillingWithQUEUE(img, 15, 15, 2);
     
-    test("Preencheu 900 pixels (30×30)", count == 900);
+    test("Preencheu 900 pixels (30x30)", count == 900);
     
     // Comparar com STACK
     Image img_stack = ImageCreate(30, 30);
@@ -299,7 +301,7 @@ void test_ImageSegmentation() {
 // ============================================================================
 void test_Performance() {
     printf("\n=== TESTE DE PERFORMANCE ===\n");
-    printf("Comparando Region Filling 150×150 (22500 pixels)\n\n");
+    printf("Comparando Region Filling 150150 (22500 pixels)\n\n");
     
     // Recursive
     Image img_rec = ImageCreate(150, 150);
@@ -326,7 +328,7 @@ void test_Performance() {
     ImageDestroy(&img_queue);
     
     // Rotações
-    printf("\n\nComparando Rotações 200×200\n\n");
+    printf("\n\nComparando Rotações 200x200\n\n");
     Image large = ImageCreateChess(200, 200, 40, RED);
     
     InstrReset();
@@ -349,9 +351,9 @@ void test_Performance() {
 int main(int argc, char* argv[]) {
     program_name = argv[0];
     
-    printf("╔══════════════════════════════════════════════════════════╗\n");
-    printf("║     TESTES DAS 8 FUNÇÕES OTIMIZADAS - imageRGB.c         ║\n");
-    printf("╚══════════════════════════════════════════════════════════╝\n");
+    printf("+----------------------------------------------------------+\n");
+    printf("|     TESTES DAS 8 FUNÇÕES OTIMIZADAS - imageRGB.c         |\n");
+    printf("+----------------------------------------------------------+\n");
     
     ImageInit();
     
@@ -371,27 +373,27 @@ int main(int argc, char* argv[]) {
     }
     
     // Resumo final
-    printf("\n╔══════════════════════════════════════════════════════════╗\n");
-    printf("║  RESUMO DOS TESTES                                       ║\n");
-    printf("║  Passaram: %2d / %2d                                       ║\n", 
+    printf("\n+----------------------------------------------------------+\n");
+    printf("|  RESUMO DOS TESTES                                       |\n");
+    printf("|  Passaram: %2d / %2d                                       |\n", 
            tests_passed, tests_total);
     
     if (tests_passed == tests_total) {
-        printf("║  Status: ✓ TODOS OS TESTES PASSARAM!                     ║\n");
+        printf("|  Status: [x] TODOS OS TESTES PASSARAM!                     |\n");
     } else {
-        printf("║  Status: ✗ ALGUNS TESTES FALHARAM                        ║\n");
+        printf("|  Status: [ ] ALGUNS TESTES FALHARAM                        |\n");
     }
     
-    printf("╠══════════════════════════════════════════════════════════╣\n");
-    printf("║  Ficheiros gerados:                                      ║\n");
-    printf("║    • test_rotate90.ppm                                   ║\n");
-    printf("║    • test_rotate180.ppm                                  ║\n");
-    printf("║    • test_segmentation_chess.ppm                         ║\n");
-    printf("║    • test_segmentation_feep.ppm                          ║\n");
-    printf("╠══════════════════════════════════════════════════════════╣\n");
-    printf("║  Dica: Execute './testOptimized --perf' para ver         ║\n");
-    printf("║        comparações de performance detalhadas             ║\n");
-    printf("╚══════════════════════════════════════════════════════════╝\n");
+    printf("+----------------------------------------------------------+\n");
+    printf("|  Ficheiros gerados:                                      |\n");
+    printf("|    • test_rotate90.ppm                                   |\n");
+    printf("|    • test_rotate180.ppm                                  |\n");
+    printf("|    • test_segmentation_chess.ppm                         |\n");
+    printf("|    • test_segmentation_feep.ppm                          |\n");
+    printf("+----------------------------------------------------------+\n");
+    printf("|  Dica: Execute './testOptimized --perf' para ver         |\n");
+    printf("|        comparações de performance detalhadas             |\n");
+    printf("+----------------------------------------------------------+\n");
     
     return (tests_passed == tests_total) ? 0 : 1;
 }
