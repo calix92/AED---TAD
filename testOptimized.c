@@ -95,8 +95,8 @@ void test_ImageIsEqual() {
     
     test("Imagens idênticas são iguais", ImageIsEqual(img1, img2));
     test("Mesma instância é igual", ImageIsEqual(img1, img1));
-    test("Cores diferentes → não iguais", !ImageIsEqual(img1, img3));
-    test("Dimensões diferentes → não iguais", !ImageIsEqual(img1, img4));
+    test("Cores diferentes -> não iguais", !ImageIsEqual(img1, img3));
+    test("Dimensões diferentes -> não iguais", !ImageIsEqual(img1, img4));
     
     ImageDestroy(&img1);
     ImageDestroy(&img2);
@@ -127,7 +127,7 @@ void test_ImageRotate90CW() {
     test("4 rotações 90° = original", ImageIsEqual(original, r4));
     
     ImageSavePPM(rotated, "test_rotate90.ppm");
-    printf("  → Ficheiro salvo: test_rotate90.ppm\n");
+    printf("  -> Ficheiro salvo: test_rotate90.ppm\n");
     
     ImageDestroy(&original);
     ImageDestroy(&rotated);
@@ -160,7 +160,7 @@ void test_ImageRotate180CW() {
     test("Rotação 180° = 2x90°", ImageIsEqual(rotated, r90_2));
     
     ImageSavePPM(rotated, "test_rotate180.ppm");
-    printf("  → Ficheiro salvo: test_rotate180.ppm\n");
+    printf("  -> Ficheiro salvo: test_rotate180.ppm\n");
     
     ImageDestroy(&original);
     ImageDestroy(&rotated);
@@ -260,7 +260,7 @@ void test_ImageSegmentation() {
     test("LUT tem 6 cores (2 orig + 4 novas)", ImageColors(img) == 6);
     
     ImageSavePPM(img, "test_segmentation_chess.ppm");
-    printf("  → Ficheiro salvo: test_segmentation_chess.ppm\n");
+    printf("  -> Ficheiro salvo: test_segmentation_chess.ppm\n");
     
     ImageDestroy(&img);
     
@@ -277,11 +277,11 @@ void test_ImageSegmentation() {
     test("Mesmo nº regiões (Stack vs Queue)", r_stack == r_queue);
     test("Mesmo nº cores geradas", ImageColors(img_rec) == ImageColors(img_stack));
     
-    printf("  → Regiões encontradas: Rec=%d, Stack=%d, Queue=%d\n", 
+    printf("  -> Regiões encontradas: Rec=%d, Stack=%d, Queue=%d\n", 
            r_rec, r_stack, r_queue);
     
     ImageSavePPM(img_stack, "test_segmentation_feep.ppm");
-    printf("  → Ficheiro salvo: test_segmentation_feep.ppm\n");
+    printf("  -> Ficheiro salvo: test_segmentation_feep.ppm\n");
     
     ImageDestroy(&img_rec);
     ImageDestroy(&img_stack);
@@ -379,9 +379,9 @@ int main(int argc, char* argv[]) {
            tests_passed, tests_total);
     
     if (tests_passed == tests_total) {
-        printf("|  Status: [x] TODOS OS TESTES PASSARAM!                     |\n");
+        printf("|  Status: [x] TODOS OS TESTES PASSARAM!                   |\n");
     } else {
-        printf("|  Status: [ ] ALGUNS TESTES FALHARAM                        |\n");
+        printf("|  Status: [ ] ALGUNS TESTES FALHARAM                      |\n");
     }
     
     printf("+----------------------------------------------------------+\n");
